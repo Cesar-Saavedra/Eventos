@@ -1,0 +1,27 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: ms-eventos
+  datasource:
+    url: jdbc:mysql://localhost:3307/ms_eventos
+    username: root
+    password: 
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+
+jwt:
+  secret: c2VjcmV0b011eUZ1ZXJ0ZVBhcmFDYXJkTGlua1Byb3llY3RvRHVvYzIwMjY=
+  expiration: 86400000
+
+ms:
+  tiendas:
+    url: http://localhost:8084
+  usuarios:
+    url: http://localhost:8082

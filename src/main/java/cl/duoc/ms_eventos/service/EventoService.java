@@ -239,17 +239,18 @@ public class EventoService {
      *
      * @param id          id del evento
      * @param nuevoEstado el nuevo estado a asignar
-     * @param tiendaId    id de la tienda (para verificar que es la organizadora)
-     * @param authHeader  header para consultar nombre de la tienda
+     * @param usuarioId   id del usuario autenticado (dueno de la tienda, viene del token)
+     * @param authHeader  header para consultar la tienda y verificar la propiedad
      */
     public EventoRespuestaDto cambiarEstado(Integer id, EstadoEvento nuevoEstado,
-                                             Integer tiendaId, String authHeader) {
+                                             Integer usuarioId, String authHeader) {
 
         Evento evento = eventoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Evento no encontrado con id: " + id));
 
-        // Verificar que la tienda autenticada sea la organizadora del evento
-        if (!evento.getTiendaId().equals(tiendaId)) {
+        // El id de la tienda NO es el mismo que el id del usuario dueno,
+        // hay que resolver cuales tiendas son del usuario autenticado.
+        if (!esTiendaDelUsuario(evento.getTiendaId(), usuarioId, authHeader)) {
             throw new RuntimeException("No tienes permiso para modificar este evento. "
                     + "Solo la tienda organizadora puede cambiarlo.");
         }
@@ -258,7 +259,7 @@ public class EventoService {
         evento.setEstado(nuevoEstado);
         Evento eventoActualizado = eventoRepository.save(evento);
 
-        Map<String, Object> datosTienda = consultarResumenTienda(tiendaId, authHeader);
+        Map<String, Object> datosTienda = consultarResumenTienda(evento.getTiendaId(), authHeader);
         String nombreTienda = datosTienda != null
                 ? (String) datosTienda.get("nombre")
                 : "Tienda desconocida";
@@ -358,16 +359,18 @@ public class EventoService {
      * Devuelve la lista de jugadores inscritos en un evento.
      * Solo la tienda organizadora puede ver la lista completa.
      *
-     * @param eventoId  id del evento
-     * @param tiendaId  id de la tienda (para verificar que es la organizadora)
+     * @param eventoId   id del evento
+     * @param usuarioId  id del usuario autenticado (dueno de la tienda, viene del token)
+     * @param authHeader header para consultar la tienda y verificar la propiedad
      */
-    public List<InscripcionRespuestaDto> verParticipantes(Integer eventoId, Integer tiendaId) {
+    public List<InscripcionRespuestaDto> verParticipantes(Integer eventoId, Integer usuarioId, String authHeader) {
 
         Evento evento = eventoRepository.findById(eventoId)
                 .orElseThrow(() -> new RuntimeException("Evento no encontrado con id: " + eventoId));
 
-        // Verificar que quien consulta sea la tienda organizadora
-        if (!evento.getTiendaId().equals(tiendaId)) {
+        // El id de la tienda NO es el mismo que el id del usuario dueno,
+        // hay que resolver cuales tiendas son del usuario autenticado.
+        if (!esTiendaDelUsuario(evento.getTiendaId(), usuarioId, authHeader)) {
             throw new RuntimeException("Solo la tienda organizadora puede ver la lista de participantes.");
         }
 
@@ -413,6 +416,48 @@ public class EventoService {
             System.out.println("[ms-eventos] No se pudo consultar ms-tiendas para tienda "
                     + tiendaId + ": " + e.getMessage());
             return null;
+        }
+    }
+
+    /*
+     * Verifica si una tienda (por su id real en ms-tiendas) pertenece
+     * al usuario autenticado. El id de la tienda es distinto del id
+     * del usuario dueno, por lo que hay que resolverlo consultando
+     * ms-tiendas en lugar de comparar los ids directamente.
+     *
+     * @param tiendaId   id de la tienda organizadora del evento
+     * @param usuarioId  id del usuario autenticado (viene del token)
+     * @param authHeader header completo "Bearer eyJ..." para la peticion
+     */
+    @SuppressWarnings("unchecked")
+    private boolean esTiendaDelUsuario(Integer tiendaId, Integer usuarioId, String authHeader) {
+        try {
+            String url = urlMsTiendas + "/api/tiendas/dueno/" + usuarioId;
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", authHeader);
+            HttpEntity<Void> peticion = new HttpEntity<>(headers);
+
+            ResponseEntity<List> respuesta = restTemplate.exchange(
+                    url, HttpMethod.GET, peticion, List.class);
+
+            List<Map<String, Object>> tiendasDelUsuario = respuesta.getBody();
+            if (tiendasDelUsuario == null) {
+                return false;
+            }
+
+            for (Map<String, Object> tienda : tiendasDelUsuario) {
+                Object id = tienda.get("id");
+                if (id != null && tiendaId.equals(((Number) id).intValue())) {
+                    return true;
+                }
+            }
+            return false;
+
+        } catch (Exception e) {
+            System.out.println("[ms-eventos] No se pudo verificar el dueno de la tienda "
+                    + tiendaId + ": " + e.getMessage());
+            return false;
         }
     }
 

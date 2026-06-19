@@ -23,6 +23,7 @@ import cl.duoc.ms_eventos.dto.InscripcionRespuestaDto;
 import cl.duoc.ms_eventos.model.EstadoEvento;
 import cl.duoc.ms_eventos.security.JwtUtil;
 import cl.duoc.ms_eventos.service.EventoService;
+import jakarta.validation.Valid;
 
 /*
  * Controlador REST de ms-eventos.
@@ -165,7 +166,7 @@ public class EventoController {
     public ResponseEntity<?> crearEvento(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @PathVariable Integer tiendaId,
-            @RequestBody CrearEventoDto dto) {
+            @Valid @RequestBody CrearEventoDto dto) {
 
         String token = validarHeader(authHeader);
         if (token == null) {
@@ -252,12 +253,13 @@ public class EventoController {
             return respuestaNoAutorizado("Solo los usuarios con rol TIENDA pueden cambiar el estado de un evento.");
         }
 
-        // El tiendaId viene del token: usamos el id del usuario autenticado como tiendaId
-        // Esto funciona porque en ms-tiendas el usuarioId del dueno es el mismo que en ms-login
-        Integer tiendaId = jwtUtil.extraerId(token);
+        // El id del usuario autenticado (dueno de la tienda) viene del token.
+        // No es el mismo id que el de la tienda: el servicio resuelve la
+        // tienda real consultando a ms-tiendas antes de verificar el permiso.
+        Integer usuarioId = jwtUtil.extraerId(token);
 
         try {
-            EventoRespuestaDto evento = eventoService.cambiarEstado(id, nuevoEstado, tiendaId, authHeader);
+            EventoRespuestaDto evento = eventoService.cambiarEstado(id, nuevoEstado, usuarioId, authHeader);
             return ResponseEntity.ok(evento);
         } catch (RuntimeException e) {
             return respuestaError(e.getMessage());
@@ -371,10 +373,11 @@ public class EventoController {
             return respuestaNoAutorizado("Solo los usuarios con rol TIENDA pueden ver la lista de participantes.");
         }
 
-        Integer tiendaId = jwtUtil.extraerId(token);
+        Integer usuarioId = jwtUtil.extraerId(token);
 
         try {
-            List<InscripcionRespuestaDto> participantes = eventoService.verParticipantes(id, tiendaId);
+            List<InscripcionRespuestaDto> participantes =
+                    eventoService.verParticipantes(id, usuarioId, authHeader);
             return ResponseEntity.ok(participantes);
         } catch (RuntimeException e) {
             return respuestaError(e.getMessage());

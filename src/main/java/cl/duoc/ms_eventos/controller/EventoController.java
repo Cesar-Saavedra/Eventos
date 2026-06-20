@@ -23,6 +23,8 @@ import cl.duoc.ms_eventos.dto.InscripcionRespuestaDto;
 import cl.duoc.ms_eventos.model.EstadoEvento;
 import cl.duoc.ms_eventos.security.JwtUtil;
 import cl.duoc.ms_eventos.service.EventoService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 /*
@@ -68,6 +70,7 @@ import jakarta.validation.Valid;
  */
 @RestController
 @RequestMapping("/api/eventos")
+@Tag(name = "Eventos", description = "Gestión de eventos y torneos organizados por tiendas")
 public class EventoController {
 
     @Autowired
@@ -92,6 +95,7 @@ public class EventoController {
      * GET http://localhost:8087/api/eventos
      */
     @GetMapping
+    @Operation(summary = "Listar eventos abiertos", description = "Devuelve todos los eventos con estado ABIERTO disponibles para inscripción.")
     public ResponseEntity<?> listarEventosAbiertos(
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
@@ -123,6 +127,7 @@ public class EventoController {
      * GET http://localhost:8087/api/eventos/1
      */
     @GetMapping("/{id}")
+    @Operation(summary = "Ver evento por ID", description = "Devuelve los datos completos de un evento, incluyendo cupos disponibles.")
     public ResponseEntity<?> verEvento(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @PathVariable Integer id) {
@@ -163,6 +168,7 @@ public class EventoController {
      * Respuesta 201: el evento creado con estado ABIERTO
      */
     @PostMapping("/tienda/{tiendaId}")
+    @Operation(summary = "Crear evento", description = "Crea un nuevo torneo o evento para la tienda indicada. Solo rol TIENDA.")
     public ResponseEntity<?> crearEvento(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @PathVariable Integer tiendaId,
@@ -202,6 +208,7 @@ public class EventoController {
      * GET http://localhost:8087/api/eventos/tienda/3
      */
     @GetMapping("/tienda/{tiendaId}")
+    @Operation(summary = "Eventos de una tienda", description = "Devuelve todos los eventos de la tienda (todos los estados). Útil para gestión del historial.")
     public ResponseEntity<?> listarEventosDeTienda(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @PathVariable Integer tiendaId) {
@@ -237,6 +244,7 @@ public class EventoController {
      * Respuesta 200: el evento con el nuevo estado
      */
     @PutMapping("/{id}/estado")
+    @Operation(summary = "Cambiar estado del evento", description = "Cambia el estado del evento (CERRADO, EN_CURSO, FINALIZADO, CANCELADO). Solo la tienda organizadora.")
     public ResponseEntity<?> cambiarEstado(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @PathVariable Integer id,
@@ -285,6 +293,7 @@ public class EventoController {
      * (sin body, solo el header Authorization)
      */
     @PostMapping("/{id}/inscribirse")
+    @Operation(summary = "Inscribirse en evento", description = "El usuario autenticado se inscribe en el evento. No se puede inscribir dos veces.")
     public ResponseEntity<?> inscribirse(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @PathVariable Integer id) {
@@ -323,6 +332,7 @@ public class EventoController {
      * GET http://localhost:8087/api/eventos/mis-inscripciones
      */
     @GetMapping("/mis-inscripciones")
+    @Operation(summary = "Mis inscripciones", description = "Historial de todos los eventos en los que se inscribió el usuario autenticado.")
     public ResponseEntity<?> misInscripciones(
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
@@ -359,6 +369,7 @@ public class EventoController {
      * GET http://localhost:8087/api/eventos/1/participantes
      */
     @GetMapping("/{id}/participantes")
+    @Operation(summary = "Ver participantes", description = "Lista de jugadores inscritos en el evento. Solo la tienda organizadora puede consultarlo.")
     public ResponseEntity<?> verParticipantes(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @PathVariable Integer id) {

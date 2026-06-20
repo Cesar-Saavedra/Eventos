@@ -1,8 +1,14 @@
 package cl.duoc.ms_eventos.repository;
 
 import java.util.List;
+import java.util.Optional;
+
+import jakarta.persistence.LockModeType;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import cl.duoc.ms_eventos.model.EstadoEvento;
@@ -32,5 +38,16 @@ public interface EventoRepository extends JpaRepository<Evento, Integer> {
     // Eventos de una tienda con un estado especifico
     // Ejemplo: ver todos los torneos ABIERTOS de la tienda 3
     List<Evento> findByTiendaIdAndEstado(Integer tiendaId, EstadoEvento estado);
+
+    /*
+     * Busca el evento y bloquea la fila (SELECT ... FOR UPDATE) hasta que
+     * termine la transaccion actual. Se usa al inscribirse para que el
+     * conteo de cupos y la insercion de la inscripcion sean atomicos:
+     * dos inscripciones concurrentes al ultimo cupo ya no pueden
+     * pasar ambas el chequeo de cupos disponibles.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT e FROM Evento e WHERE e.id = :id")
+    Optional<Evento> findByIdConBloqueo(@Param("id") Integer id);
 
 }

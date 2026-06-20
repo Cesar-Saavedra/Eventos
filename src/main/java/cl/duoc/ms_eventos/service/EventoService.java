@@ -5,7 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import cl.duoc.ms_eventos.client.TiendaFeignClient;
 import cl.duoc.ms_eventos.client.UsuarioFeignClient;
@@ -181,10 +183,19 @@ public class EventoService {
     // INSCRIBIRSE A UN EVENTO
     // =========================================================
 
+    /*
+     * @Transactional + bloqueo pesimista sobre el evento: dos inscripciones
+     * concurrentes al mismo evento quedan serializadas, por lo que el conteo
+     * de cupos y el guardado de la inscripcion son atomicos (ya no se puede
+     * sobre-inscribir el ultimo cupo con requests en paralelo). La restriccion
+     * unica (evento_id, usuarioId) en la tabla actua como segunda barrera
+     * contra la doble inscripcion.
+     */
+    @Transactional
     public InscripcionRespuestaDto inscribirse(Integer eventoId, Integer usuarioId,
                                                 String nombre, String authHeader) {
 
-        Evento evento = eventoRepository.findById(eventoId)
+        Evento evento = eventoRepository.findByIdConBloqueo(eventoId)
                 .orElseThrow(() -> new RuntimeException("Evento no encontrado con id: " + eventoId));
 
         if (!EstadoEvento.ABIERTO.equals(evento.getEstado())) {
@@ -202,7 +213,14 @@ public class EventoService {
         nuevaInscripcion.setUsuarioId(usuarioId);
         nuevaInscripcion.setFechaInscripcion(LocalDateTime.now());
         nuevaInscripcion.setConfirmado(false);
-        Inscripcion guardada = inscripcionRepository.save(nuevaInscripcion);
+
+        Inscripcion guardada;
+        try {
+            guardada = inscripcionRepository.save(nuevaInscripcion);
+        } catch (DataIntegrityViolationException e) {
+            // Respaldo si dos requests pasaron el check de arriba casi al mismo tiempo
+            throw new RuntimeException("Ya estas inscrito en este evento.");
+        }
 
         // Notificar a ms-usuarios (fire and forget)
         notificarInscripcionAUsuarios(usuarioId, authHeader);

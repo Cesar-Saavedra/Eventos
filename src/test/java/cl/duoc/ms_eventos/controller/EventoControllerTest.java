@@ -20,6 +20,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import cl.duoc.ms_eventos.dto.CrearEventoDto;
 import cl.duoc.ms_eventos.dto.EventoRespuestaDto;
 import cl.duoc.ms_eventos.dto.InscripcionRespuestaDto;
@@ -27,8 +30,6 @@ import cl.duoc.ms_eventos.model.EstadoEvento;
 import cl.duoc.ms_eventos.model.TipoEvento;
 import cl.duoc.ms_eventos.security.JwtUtil;
 import cl.duoc.ms_eventos.service.EventoService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 @WebMvcTest(EventoController.class)
 public class EventoControllerTest {

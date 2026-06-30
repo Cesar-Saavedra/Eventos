@@ -24,6 +24,11 @@ import cl.duoc.ms_eventos.model.EstadoEvento;
 import cl.duoc.ms_eventos.security.JwtUtil;
 import cl.duoc.ms_eventos.service.EventoService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
@@ -37,36 +42,6 @@ import jakarta.validation.Valid;
  *
  * TODOS los endpoints requieren:
  *   Header: Authorization: Bearer {token}
- *
- * -------------------------------------------------------
- * ENDPOINTS PARA JUGADORES (cualquier rol):
- * -------------------------------------------------------
- * GET /api/eventos
- *     -> Ver todos los eventos abiertos a inscripciones
- *
- * GET /api/eventos/{id}
- *     -> Ver los datos completos de un evento
- *
- * POST /api/eventos/{id}/inscribirse
- *     -> Inscribirse en un evento
- *
- * GET /api/eventos/mis-inscripciones
- *     -> Ver los eventos en los que estoy inscrito
- *
- * -------------------------------------------------------
- * ENDPOINTS PARA TIENDAS (solo rol TIENDA):
- * -------------------------------------------------------
- * POST /api/eventos/tienda/{tiendaId}
- *     -> Crear un nuevo evento para mi tienda
- *
- * GET /api/eventos/tienda/{tiendaId}
- *     -> Ver todos los eventos de mi tienda
- *
- * PUT /api/eventos/{id}/estado
- *     -> Cambiar el estado de mi evento (CERRADO, EN_CURSO, etc.)
- *
- * GET /api/eventos/{id}/participantes
- *     -> Ver la lista de jugadores inscritos en mi evento
  */
 @RestController
 @RequestMapping("/api/eventos")
@@ -79,24 +54,14 @@ public class EventoController {
     @Autowired
     private JwtUtil jwtUtil;
 
-    // =========================================================
-    // GET /api/eventos
-    // Ver todos los eventos abiertos (vista publica)
-    // =========================================================
-    /*
-     * Header: Authorization: Bearer {token}
-     *
-     * Devuelve todos los eventos con estado ABIERTO.
-     * Cualquier usuario autenticado puede verlos.
-     *
-     * Respuesta 200: lista de EventoRespuestaDto
-     *
-     * Ejemplo en Postman:
-     * GET http://localhost:8087/api/eventos
-     */
     @GetMapping
     @Operation(summary = "Listar eventos abiertos", description = "Devuelve todos los eventos con estado ABIERTO disponibles para inscripción.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de eventos abiertos obtenida correctamente"),
+            @ApiResponse(responseCode = "401", description = "Token ausente, inválido o expirado")
+    })
     public ResponseEntity<?> listarEventosAbiertos(
+            @Parameter(description = "Token JWT con formato 'Bearer {token}'", required = true)
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
         String token = validarHeader(authHeader);
@@ -112,24 +77,17 @@ public class EventoController {
         }
     }
 
-    // =========================================================
-    // GET /api/eventos/{id}
-    // Ver los datos de un evento especifico
-    // =========================================================
-    /*
-     * Header: Authorization: Bearer {token}
-     * Path param: id = id del evento
-     *
-     * Respuesta 200: EventoRespuestaDto con cuposDisponibles calculado
-     * Respuesta 404: si el evento no existe
-     *
-     * Ejemplo en Postman:
-     * GET http://localhost:8087/api/eventos/1
-     */
     @GetMapping("/{id}")
     @Operation(summary = "Ver evento por ID", description = "Devuelve los datos completos de un evento, incluyendo cupos disponibles.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Evento encontrado"),
+            @ApiResponse(responseCode = "401", description = "Token ausente, inválido o expirado"),
+            @ApiResponse(responseCode = "404", description = "El evento no existe")
+    })
     public ResponseEntity<?> verEvento(
+            @Parameter(description = "Token JWT con formato 'Bearer {token}'", required = true)
             @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @Parameter(description = "ID del evento a consultar", required = true, example = "1")
             @PathVariable Integer id) {
 
         String token = validarHeader(authHeader);
@@ -146,32 +104,42 @@ public class EventoController {
         }
     }
 
-    // =========================================================
-    // POST /api/eventos/tienda/{tiendaId}
-    // Crear un nuevo evento para una tienda
-    // =========================================================
-    /*
-     * Header: Authorization: Bearer {token}
-     * Path param: tiendaId = id de la tienda organizadora
-     * Solo usuarios con rol TIENDA pueden crear eventos.
-     *
-     * Body JSON:
-     * {
-     *   "nombre": "Torneo Regional Pokemon - Mayo 2026",
-     *   "descripcion": "Formato Estandar, cupos limitados.",
-     *   "tipoEvento": "TORNEO",
-     *   "fechaInicio": "2026-05-30T14:00:00",
-     *   "cuposMaximos": 16,
-     *   "precioInscripcion": 3000
-     * }
-     *
-     * Respuesta 201: el evento creado con estado ABIERTO
-     */
     @PostMapping("/tienda/{tiendaId}")
     @Operation(summary = "Crear evento", description = "Crea un nuevo torneo o evento para la tienda indicada. Solo rol TIENDA.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Evento creado con estado ABIERTO", content = @Content(
+                    examples = @ExampleObject(name = "EventoCreado", value = """
+                            {
+                              "id": 1,
+                              "nombre": "Torneo Regional Pokemon - Mayo 2026",
+                              "descripcion": "Formato Estandar, cupos limitados.",
+                              "tipoEvento": "TORNEO",
+                              "fechaInicio": "2026-05-30T14:00:00",
+                              "cuposMaximos": 16,
+                              "cuposDisponibles": 16,
+                              "precioInscripcion": 3000,
+                              "estado": "ABIERTO"
+                            }
+                            """))),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos o solicitud inválida"),
+            @ApiResponse(responseCode = "401", description = "Token ausente, inválido, o rol distinto de TIENDA")
+    })
     public ResponseEntity<?> crearEvento(
+            @Parameter(description = "Token JWT con formato 'Bearer {token}', debe pertenecer a un usuario con rol TIENDA", required = true)
             @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @Parameter(description = "ID de la tienda organizadora", required = true, example = "3")
             @PathVariable Integer tiendaId,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Datos del evento a crear", required = true,
+                    content = @Content(examples = @ExampleObject(value = """
+                            {
+                              "nombre": "Torneo Regional Pokemon - Mayo 2026",
+                              "descripcion": "Formato Estandar, cupos limitados.",
+                              "tipoEvento": "TORNEO",
+                              "fechaInicio": "2026-05-30T14:00:00",
+                              "cuposMaximos": 16,
+                              "precioInscripcion": 3000
+                            }
+                            """)))
             @Valid @RequestBody CrearEventoDto dto) {
 
         String token = validarHeader(authHeader);
@@ -193,24 +161,16 @@ public class EventoController {
         }
     }
 
-    // =========================================================
-    // GET /api/eventos/tienda/{tiendaId}
-    // Ver todos los eventos de una tienda
-    // =========================================================
-    /*
-     * Header: Authorization: Bearer {token}
-     * Path param: tiendaId = id de la tienda
-     *
-     * Devuelve todos los eventos de la tienda (todos los estados).
-     * Lo usa la tienda para gestionar su historial de eventos.
-     *
-     * Ejemplo en Postman:
-     * GET http://localhost:8087/api/eventos/tienda/3
-     */
     @GetMapping("/tienda/{tiendaId}")
     @Operation(summary = "Eventos de una tienda", description = "Devuelve todos los eventos de la tienda (todos los estados). Útil para gestión del historial.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de eventos de la tienda"),
+            @ApiResponse(responseCode = "401", description = "Token ausente, inválido o expirado")
+    })
     public ResponseEntity<?> listarEventosDeTienda(
+            @Parameter(description = "Token JWT con formato 'Bearer {token}'", required = true)
             @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @Parameter(description = "ID de la tienda", required = true, example = "3")
             @PathVariable Integer tiendaId) {
 
         String token = validarHeader(authHeader);
@@ -226,28 +186,19 @@ public class EventoController {
         }
     }
 
-    // =========================================================
-    // PUT /api/eventos/{id}/estado
-    // Cambiar el estado de un evento
-    // =========================================================
-    /*
-     * Header: Authorization: Bearer {token}
-     * Path param: id = id del evento
-     * Query param: nuevoEstado = CERRADO | EN_CURSO | FINALIZADO | CANCELADO
-     *
-     * Solo la tienda organizadora del evento puede cambiarlo.
-     * El tiendaId se extrae del token, no del body.
-     *
-     * Ejemplo en Postman:
-     * PUT http://localhost:8087/api/eventos/1/estado?nuevoEstado=CERRADO
-     *
-     * Respuesta 200: el evento con el nuevo estado
-     */
     @PutMapping("/{id}/estado")
     @Operation(summary = "Cambiar estado del evento", description = "Cambia el estado del evento (CERRADO, EN_CURSO, FINALIZADO, CANCELADO). Solo la tienda organizadora.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Evento con el nuevo estado"),
+            @ApiResponse(responseCode = "400", description = "Transición de estado inválida"),
+            @ApiResponse(responseCode = "401", description = "Token ausente, inválido, o el usuario no es dueño del evento")
+    })
     public ResponseEntity<?> cambiarEstado(
+            @Parameter(description = "Token JWT con formato 'Bearer {token}', debe pertenecer a la tienda organizadora", required = true)
             @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @Parameter(description = "ID del evento", required = true, example = "1")
             @PathVariable Integer id,
+            @Parameter(description = "Nuevo estado del evento", required = true, example = "CERRADO")
             @RequestParam EstadoEvento nuevoEstado) {
 
         String token = validarHeader(authHeader);
@@ -274,28 +225,17 @@ public class EventoController {
         }
     }
 
-    // =========================================================
-    // POST /api/eventos/{id}/inscribirse
-    // Inscribirse en un evento
-    // =========================================================
-    /*
-     * Header: Authorization: Bearer {token}
-     * Path param: id = id del evento
-     *
-     * El usuarioId y nombre se extraen del token.
-     * El jugador no puede inscribirse dos veces al mismo evento.
-     *
-     * Respuesta 201: la inscripcion creada
-     * Respuesta 400: si ya esta inscrito, no hay cupos o el evento no esta abierto
-     *
-     * Ejemplo en Postman:
-     * POST http://localhost:8087/api/eventos/1/inscribirse
-     * (sin body, solo el header Authorization)
-     */
     @PostMapping("/{id}/inscribirse")
     @Operation(summary = "Inscribirse en evento", description = "El usuario autenticado se inscribe en el evento. No se puede inscribir dos veces.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Inscripción creada"),
+            @ApiResponse(responseCode = "400", description = "Ya está inscrito, no hay cupos o el evento no está abierto"),
+            @ApiResponse(responseCode = "401", description = "Token ausente, inválido o expirado")
+    })
     public ResponseEntity<?> inscribirse(
+            @Parameter(description = "Token JWT con formato 'Bearer {token}'", required = true)
             @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @Parameter(description = "ID del evento al que se desea inscribir", required = true, example = "1")
             @PathVariable Integer id) {
 
         String token = validarHeader(authHeader);
@@ -316,24 +256,14 @@ public class EventoController {
         }
     }
 
-    // =========================================================
-    // GET /api/eventos/mis-inscripciones
-    // Ver mis inscripciones (historial del jugador)
-    // =========================================================
-    /*
-     * Header: Authorization: Bearer {token}
-     *
-     * Devuelve todos los eventos a los que se inscribio el usuario autenticado.
-     * Cualquier rol puede usarlo (JUGADOR, TIENDA, ORGANIZADOR).
-     *
-     * Respuesta 200: lista de InscripcionRespuestaDto
-     *
-     * Ejemplo en Postman:
-     * GET http://localhost:8087/api/eventos/mis-inscripciones
-     */
     @GetMapping("/mis-inscripciones")
     @Operation(summary = "Mis inscripciones", description = "Historial de todos los eventos en los que se inscribió el usuario autenticado.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de inscripciones del usuario"),
+            @ApiResponse(responseCode = "401", description = "Token ausente, inválido o expirado")
+    })
     public ResponseEntity<?> misInscripciones(
+            @Parameter(description = "Token JWT con formato 'Bearer {token}'", required = true)
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
         String token = validarHeader(authHeader);
@@ -352,26 +282,16 @@ public class EventoController {
         }
     }
 
-    // =========================================================
-    // GET /api/eventos/{id}/participantes
-    // Ver lista de jugadores inscritos en un evento
-    // =========================================================
-    /*
-     * Header: Authorization: Bearer {token}
-     * Path param: id = id del evento
-     *
-     * Solo la tienda organizadora puede ver la lista de participantes.
-     * El tiendaId se extrae del token del usuario autenticado.
-     *
-     * Respuesta 200: lista de InscripcionRespuestaDto
-     *
-     * Ejemplo en Postman:
-     * GET http://localhost:8087/api/eventos/1/participantes
-     */
     @GetMapping("/{id}/participantes")
     @Operation(summary = "Ver participantes", description = "Lista de jugadores inscritos en el evento. Solo la tienda organizadora puede consultarlo.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de participantes del evento"),
+            @ApiResponse(responseCode = "401", description = "Token ausente, inválido, o el usuario no es la tienda organizadora")
+    })
     public ResponseEntity<?> verParticipantes(
+            @Parameter(description = "Token JWT con formato 'Bearer {token}', debe pertenecer a la tienda organizadora", required = true)
             @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @Parameter(description = "ID del evento", required = true, example = "1")
             @PathVariable Integer id) {
 
         String token = validarHeader(authHeader);

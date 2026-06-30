@@ -5,7 +5,7 @@ spring:
   application:
     name: ms-eventos
   datasource:
-    url: jdbc:mysql://localhost:3307/ms_eventos
+    url: jdbc:mysql://localhost:3306/ms_eventos
     username: root
     password: 
   jpa:
